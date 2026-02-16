@@ -17,6 +17,11 @@ const INITIAL_DATA: TreeData = {
   ]
 };
 
+// Safe ID Generator to avoid crypto.randomUUID issues in non-secure contexts
+const generateId = () => {
+  return Date.now().toString(36) + Math.random().toString(36).substring(2);
+};
+
 // --- Connection Line Component ---
 const TreeLines = ({ members }: { members: FamilyMember[] }) => {
   const [paths, setPaths] = useState<React.ReactElement[]>([]);
@@ -27,9 +32,8 @@ const TreeLines = ({ members }: { members: FamilyMember[] }) => {
     if (!canvas) return;
 
     const canvasRect = canvas.getBoundingClientRect();
-    const scale = canvasRect.width / canvas.offsetWidth;
+    const scale = canvasRect.width / canvas.offsetWidth || 1;
 
-    // Group children by their "Source Unit" (either a Couple or a Single Parent)
     const units = new Map<string, { parentIds: string[], childrenIds: string[] }>();
 
     members.forEach(m => {
@@ -48,12 +52,14 @@ const TreeLines = ({ members }: { members: FamilyMember[] }) => {
         unitKey = unitParents.join('_');
       } else {
         const singleParent = pObj1 || pObj2;
-        if (singleParent?.spouseId) {
-          unitParents = [singleParent.id, singleParent.spouseId].sort();
-          unitKey = unitParents.join('_');
-        } else if (singleParent) {
-          unitParents = [singleParent.id];
-          unitKey = singleParent.id;
+        if (singleParent) {
+          if (singleParent.spouseId) {
+             unitParents = [singleParent.id, singleParent.spouseId].sort();
+             unitKey = unitParents.join('_');
+          } else {
+             unitParents = [singleParent.id];
+             unitKey = singleParent.id;
+          }
         }
       }
 
@@ -61,7 +67,8 @@ const TreeLines = ({ members }: { members: FamilyMember[] }) => {
         if (!units.has(unitKey)) {
           units.set(unitKey, { parentIds: unitParents, childrenIds: [] });
         }
-        units.get(unitKey)!.childrenIds.push(m.id);
+        const u = units.get(unitKey)!;
+        if (!u.childrenIds.includes(m.id)) u.childrenIds.push(m.id);
       }
     });
 
@@ -69,7 +76,6 @@ const TreeLines = ({ members }: { members: FamilyMember[] }) => {
       let sx: number | undefined;
       let sy: number | undefined;
 
-      // 1. Identify Source Point (Heart or Parent Center)
       if (parentIds.length === 2) {
         const heartId = `heart-${parentIds[0]}-${parentIds[1]}`;
         const altHeartId = `heart-${parentIds[1]}-${parentIds[0]}`;
@@ -100,7 +106,6 @@ const TreeLines = ({ members }: { members: FamilyMember[] }) => {
 
       if (sx === undefined || sy === undefined) return;
 
-      // 2. Draw Curved Branches to each Child
       childrenIds.forEach(cId => {
         const cEl = document.getElementById(`member-${cId}`);
         if (cEl) {
@@ -108,7 +113,6 @@ const TreeLines = ({ members }: { members: FamilyMember[] }) => {
           const cx = (r.left + r.width / 2 - canvasRect.left) / scale;
           const cy = (r.top - canvasRect.top) / scale;
 
-          // Smooth S-curve (Bezier) from sx, sy to cx, cy
           const midY = (sy + cy) / 2;
           const curvePath = `M ${sx} ${sy} C ${sx} ${midY}, ${cx} ${midY}, ${cx} ${cy}`;
           
@@ -131,15 +135,17 @@ const TreeLines = ({ members }: { members: FamilyMember[] }) => {
   }, [members]);
 
   useEffect(() => {
-    const handle = requestAnimationFrame(function update() {
+    let frameId: number;
+    const update = () => {
       calculatePaths();
-      requestAnimationFrame(update);
-    });
-    return () => cancelAnimationFrame(handle);
+      frameId = requestAnimationFrame(update);
+    };
+    frameId = requestAnimationFrame(update);
+    return () => cancelAnimationFrame(frameId);
   }, [calculatePaths]);
 
   return (
-    <svg className="absolute inset-0 pointer-events-none w-full h-full">
+    <svg className="absolute inset-0 pointer-events-none w-full h-full overflow-visible">
       {paths}
     </svg>
   );
@@ -199,7 +205,7 @@ const TreeNode = ({ memberId, members, selectedId, onMemberClick, processedIds }
 
 const App: React.FC = () => {
   const [data, setData] = useState<TreeData>(() => {
-    const saved = localStorage.getItem('family_tree_v10');
+    const saved = localStorage.getItem('family_tree_v11');
     return saved ? JSON.parse(saved) : INITIAL_DATA;
   });
   
@@ -212,7 +218,7 @@ const App: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    localStorage.setItem('family_tree_v10', JSON.stringify(data));
+    localStorage.setItem('family_tree_v11', JSON.stringify(data));
   }, [data]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -234,7 +240,7 @@ const App: React.FC = () => {
   };
 
   const handleAddMember = () => {
-    const newMember: FamilyMember = { id: crypto.randomUUID(), firstName: 'New', lastName: 'Member', gender: 'male' };
+    const newMember: FamilyMember = { id: generateId(), firstName: 'New', lastName: 'Member', gender: 'male' };
     setData(prev => ({ members: [...prev.members, newMember] }));
     setSelectedId(newMember.id);
   };
@@ -245,7 +251,7 @@ const App: React.FC = () => {
     const spouse = parent.spouseId ? data.members.find(m => m.id === parent.spouseId) : null;
     
     const newChild: FamilyMember = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       firstName: 'New Child',
       lastName: parent.lastName,
       gender: 'male',
@@ -260,7 +266,7 @@ const App: React.FC = () => {
     const child = data.members.find(m => m.id === childId);
     if (!child) return;
     const newParent: FamilyMember = {
-      id: crypto.randomUUID(),
+      id: generateId(),
       firstName: type === 'father' ? 'New Father' : 'New Mother',
       lastName: child.lastName,
       gender: type === 'father' ? 'male' : 'female',

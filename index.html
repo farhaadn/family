@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Heritage Tree</title>
+    <title>Heritage Tree - Modern Family Tree</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
@@ -20,20 +20,33 @@
             background-size: 40px 40px;
             background-image: radial-gradient(circle, #1e293b 1px, transparent 1px);
         }
+        #root:empty::before {
+            content: "Loading Heritage Tree...";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #475569;
+            font-size: 14px;
+            font-family: monospace;
+        }
     </style>
 <script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://esm.sh/@google/genai@^1.41.0",
-    "react/": "https://esm.sh/react@^19.2.4/",
-    "react": "https://esm.sh/react@^19.2.4",
-    "lucide-react": "https://esm.sh/lucide-react@^0.564.0",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.4/"
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.4/",
+    "react/": "https://esm.sh/react@^19.2.4/"
   }
 }
 </script>
 </head>
 <body>
     <div id="root"></div>
+    <!-- اضافه شدن تگ اسکریپت اصلی برای لود شدن کدها -->
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
