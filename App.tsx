@@ -195,7 +195,7 @@ const TreeNode = ({ memberId, members, selectedId, onMemberClick, processedIds }
 
 const App: React.FC = () => {
   const [data, setData] = useState<TreeData>(() => {
-    const saved = localStorage.getItem('family_tree_v12');
+    const saved = localStorage.getItem('family_tree_v11');
     return saved ? JSON.parse(saved) : INITIAL_DATA;
   });
   
@@ -208,7 +208,7 @@ const App: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    localStorage.setItem('family_tree_v12', JSON.stringify(data));
+    localStorage.setItem('family_tree_v11', JSON.stringify(data));
   }, [data]);
 
   const handleMouseDown = (e: React.MouseEvent) => {
@@ -229,43 +229,42 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAddMember = useCallback(() => {
+  const handleAddMember = () => {
     const newMember: FamilyMember = { id: crypto.randomUUID(), firstName: 'New', lastName: 'Member', gender: 'male' };
     setData(prev => ({ members: [...prev.members, newMember] }));
     setSelectedId(newMember.id);
-  }, []);
+  };
 
-  const handleAddChild = useCallback((parentId: string) => {
+  const handleAddChild = (parentId: string) => {
+    const parent = data.members.find(m => m.id === parentId);
+    if (!parent) return;
+    const spouse = parent.spouseId ? data.members.find(m => m.id === parent.spouseId) : null;
+    
+    const newChild: FamilyMember = {
+      id: crypto.randomUUID(),
+      firstName: 'New Child',
+      lastName: parent.lastName,
+      gender: 'male',
+      fatherId: parent.gender === 'male' ? parent.id : (spouse?.gender === 'male' ? spouse.id : undefined),
+      motherId: parent.gender === 'female' ? parent.id : (spouse?.gender === 'female' ? spouse.id : undefined),
+    };
+    setData(prev => ({ members: [...prev.members, newChild] }));
+    setSelectedId(newChild.id);
+  };
+
+  const handleAddParent = (childId: string, type: 'father' | 'mother') => {
+    const child = data.members.find(m => m.id === childId);
+    if (!child) return;
+    const newParent: FamilyMember = {
+      id: crypto.randomUUID(),
+      firstName: type === 'father' ? 'New Father' : 'New Mother',
+      lastName: child.lastName,
+      gender: type === 'father' ? 'male' : 'female',
+    };
+    const spouseId = type === 'father' ? child.motherId : child.fatherId;
+    if (spouseId) newParent.spouseId = spouseId;
+
     setData(prev => {
-      const parent = prev.members.find(m => m.id === parentId);
-      if (!parent) return prev;
-      const spouse = parent.spouseId ? prev.members.find(m => m.id === parent.spouseId) : null;
-      
-      const newChild: FamilyMember = {
-        id: crypto.randomUUID(),
-        firstName: 'New Child',
-        lastName: parent.lastName,
-        gender: 'male',
-        fatherId: parent.gender === 'male' ? parent.id : (spouse?.gender === 'male' ? spouse.id : undefined),
-        motherId: parent.gender === 'female' ? parent.id : (spouse?.gender === 'female' ? spouse.id : undefined),
-      };
-      return { members: [...prev.members, newChild] };
-    });
-  }, []);
-
-  const handleAddParent = useCallback((childId: string, type: 'father' | 'mother') => {
-    setData(prev => {
-      const child = prev.members.find(m => m.id === childId);
-      if (!child) return prev;
-      const newParent: FamilyMember = {
-        id: crypto.randomUUID(),
-        firstName: type === 'father' ? 'New Father' : 'New Mother',
-        lastName: child.lastName,
-        gender: type === 'father' ? 'male' : 'female',
-      };
-      const spouseId = type === 'father' ? child.motherId : child.fatherId;
-      if (spouseId) newParent.spouseId = spouseId;
-
       const updated = prev.members.map(m => {
         if (m.id === childId) return type === 'father' ? { ...m, fatherId: newParent.id } : { ...m, motherId: newParent.id };
         if (spouseId && m.id === spouseId) return { ...m, spouseId: newParent.id };
@@ -273,9 +272,10 @@ const App: React.FC = () => {
       });
       return { members: [...updated, newParent] };
     });
-  }, []);
+    setSelectedId(newParent.id);
+  };
 
-  const handleSaveMember = useCallback((updated: FamilyMember) => {
+  const handleSaveMember = (updated: FamilyMember) => {
     setData(prev => {
       let list = prev.members.map(m => m.id === updated.id ? updated : m);
       if (updated.spouseId) {
@@ -284,31 +284,29 @@ const App: React.FC = () => {
       return { members: list };
     });
     setSelectedId(null);
-  }, []);
+  };
 
-  const handleDeleteMember = useCallback((id: string) => {
-    if (!window.confirm('Are you sure you want to delete this member? All their relationships will be removed.')) {
-      return;
-    }
+  const handleDeleteMember = (id: string) => {
+    const isConfirmed = window.confirm('Are you sure you want to delete this member and remove all their relationships?');
+    if (!isConfirmed) return;
 
     setData(prev => {
-      // 1. Filter out the specific member
-      const remaining = prev.members.filter(m => m.id !== id);
+      // 1. Filter out the deleted member
+      const filteredMembers = prev.members.filter(m => m.id !== id);
       
-      // 2. Clean up all pointers in other members
-      const cleaned = remaining.map(m => ({
+      // 2. Clean up all references to this member in others
+      const cleanedMembers = filteredMembers.map(m => ({
         ...m,
         spouseId: m.spouseId === id ? undefined : m.spouseId,
         fatherId: m.fatherId === id ? undefined : m.fatherId,
         motherId: m.motherId === id ? undefined : m.motherId,
       }));
 
-      return { ...prev, members: cleaned };
+      return { members: cleanedMembers };
     });
     
-    // 3. Immediately close the sidebar
     setSelectedId(null);
-  }, []);
+  };
 
   const roots = useMemo(() => {
     const rendered = new Set<string>();
@@ -417,7 +415,7 @@ const App: React.FC = () => {
         onSave={handleSaveMember}
         onDelete={handleDeleteMember}
         onAddChild={handleAddChild}
-        onAddFather={handleAddParent}
+        onAddFather={(id) => handleAddParent(id, 'father')}
         onAddMother={(id) => handleAddParent(id, 'mother')}
       />
     </div>
