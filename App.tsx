@@ -9,10 +9,9 @@ const INITIAL_DATA: TreeData = {
   members: [
     {
       id: 'm-1',
-      firstName: 'Ardeshir',
-      lastName: 'Namiranian',
+      firstName: '',
+      lastName: '',
       gender: 'male',
-      birthDate: '1970-01-01',
     }
   ]
 };
@@ -172,7 +171,7 @@ const TreeNode = ({ memberId, members, selectedId, onMemberClick, globalProcesse
 
 const App: React.FC = () => {
   const [data, setData] = useState<TreeData>(() => {
-    const saved = localStorage.getItem('family_tree_v13');
+    const saved = localStorage.getItem('family_tree_v14');
     return saved ? JSON.parse(saved) : INITIAL_DATA;
   });
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -182,7 +181,7 @@ const App: React.FC = () => {
   const [isPanning, setIsPanning] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('family_tree_v13', JSON.stringify(data));
+    localStorage.setItem('family_tree_v14', JSON.stringify(data));
   }, [data]);
 
   // منطق هوشمند برای پیدا کردن ریشه‌های واقعی (کسانی که فرزند کسی نیستند)
@@ -193,7 +192,6 @@ const App: React.FC = () => {
       if (m.motherId) childrenIds.add(m.motherId);
     });
 
-    // اصلاح: ریشه‌ها کسانی هستند که در لیست اعضا "پدر" یا "مادر" کسی ندارند
     const rootCandidates = data.members.filter(m => {
       const hasFatherInList = m.fatherId && data.members.some(x => x.id === m.fatherId);
       const hasMotherInList = m.motherId && data.members.some(x => x.id === m.motherId);
@@ -216,7 +214,7 @@ const App: React.FC = () => {
   const globalProcessed = new Set<string>();
 
   const handleAddMember = () => {
-    const newM: FamilyMember = { id: generateId(), firstName: 'New', lastName: 'Member', gender: 'male' };
+    const newM: FamilyMember = { id: generateId(), firstName: '', lastName: '', gender: 'male' };
     setData(prev => ({ members: [...prev.members, newM] }));
     setSelectedId(newM.id);
   };
@@ -248,7 +246,7 @@ const App: React.FC = () => {
     if (!p) return;
     const s = p.spouseId ? data.members.find(m => m.id === p.spouseId) : null;
     const newC: FamilyMember = {
-      id: generateId(), firstName: 'New Child', lastName: p.lastName, gender: 'male',
+      id: generateId(), firstName: '', lastName: p.lastName, gender: 'male',
       fatherId: p.gender === 'male' ? p.id : (s?.gender === 'male' ? s.id : undefined),
       motherId: p.gender === 'female' ? p.id : (s?.gender === 'female' ? s.id : undefined),
     };
@@ -303,7 +301,7 @@ const App: React.FC = () => {
               <tbody className="divide-y divide-white/5">
                 {data.members.map(m => (
                   <tr key={m.id} className="hover:bg-white/5 transition-colors group">
-                    <td className="px-6 py-4 text-sm font-bold text-slate-200">{m.firstName} {m.lastName}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-slate-200">{m.firstName || 'Unnamed'} {m.lastName}</td>
                     <td className="px-6 py-4 text-xs text-slate-500 capitalize">{m.gender}</td>
                     <td className="px-6 py-4 text-right"><button onClick={() => setSelectedId(m.id)} className="text-blue-400 text-xs font-bold hover:underline">Edit Member</button></td>
                   </tr>
@@ -329,14 +327,12 @@ const App: React.FC = () => {
         onAddFather={(id) => {
           const m = data.members.find(x => x.id === id);
           if (!m) return;
-          const newF: FamilyMember = { id: generateId(), firstName: 'Father', lastName: m.lastName, gender: 'male' };
-          // اگر مادر در سیستم هست، پدر جدید همسر او شود
+          const newF: FamilyMember = { id: generateId(), firstName: '', lastName: m.lastName, gender: 'male' };
           if (m.motherId) newF.spouseId = m.motherId;
           
           setData(prev => {
             const newList = prev.members.map(x => {
               if (x.id === id) return { ...x, fatherId: newF.id };
-              // اگر مادر وجود دارد، او را همسر پدر جدید کن
               if (m.motherId && x.id === m.motherId) return { ...x, spouseId: newF.id };
               return x;
             });
@@ -347,14 +343,12 @@ const App: React.FC = () => {
         onAddMother={(id) => {
           const m = data.members.find(x => x.id === id);
           if (!m) return;
-          const newM: FamilyMember = { id: generateId(), firstName: 'Mother', lastName: m.lastName, gender: 'female' };
-          // اگر پدر در سیستم هست، مادر جدید همسر او شود
+          const newM: FamilyMember = { id: generateId(), firstName: '', lastName: m.lastName, gender: 'female' };
           if (m.fatherId) newM.spouseId = m.fatherId;
           
           setData(prev => {
             const newList = prev.members.map(x => {
               if (x.id === id) return { ...x, motherId: newM.id };
-              // اگر پدر وجود دارد، او را همسر مادر جدید کن
               if (m.fatherId && x.id === m.fatherId) return { ...x, spouseId: newM.id };
               return x;
             });
